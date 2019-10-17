@@ -23,7 +23,9 @@ if(!require("knitr")){
   library("knitr")
 }
 
-headerUI = dropdownMenu(type = "messages", badgeStatus = "primary")
+headerUI = dropdownMenu(messageItem(from = "Admin",
+                                    message = "Welcome to Physio HBR!"),
+                        type = "messages", badgeStatus = "primary")
 
 sidebarUI = div(
   br(),
