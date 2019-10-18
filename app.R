@@ -46,7 +46,8 @@ sidebarUI = div(
 bodyUI = div(
   tableOutput("data_summary"),
   verbatimTextOutput("factor_data_names"),
-  verbatimTextOutput("numeric_data_names")
+  verbatimTextOutput("numeric_data_names"),
+  dataTableOutput("data_view")
 )
 
 ui = dashboardPage(
@@ -87,14 +88,18 @@ server = function(input, output, session) {
         stop(safeError(ee))
         
       })
-    }
-    )
+    })
     data.frame(Data_Name = input$data_file$name,
                Upload_Time = as.character(Sys.time()),
                Data_Size = paste(round(input$data_file$size * 10^(-6),3), "MB"),
                Observation = dim(dff)[1],
                Feature = dim(dff)[2])
   })
+  
+  output$data_view = renderDataTable({
+    req(input$data_file)
+    return(dff)
+  }, options = list(pageLength = 10))
   
   output$sample_data = downloadHandler(
     filename = function(){
