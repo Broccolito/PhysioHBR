@@ -22,6 +22,10 @@ if(!require("knitr")){
   install.packages("knitr")
   library("knitr")
 }
+if(!require("shinyjs")){
+  install.packages("shinyjs")
+  library("shinyjs")
+}
 
 headerUI = dropdownMenu(messageItem(from = "Admin",
                                     message = "Welcome to Physio HBR!"),
@@ -37,17 +41,54 @@ sidebarUI = div(
   sliderInput("numeric_selection", label = "Numeric Range", min = 1, 
               max = 100, value = c(1, 2)),
   h4(HTML("<hr>&nbsp&nbsp"), "Analysis"),
-  actionBttn("plot_cov_heatmap", label = "Cov Heatmap", 
-             block = FALSE, style = "float"),
-  actionBttn("plot_cov_diff_heatmap", label = "Diff Heatmap",
-             block = FALSE, style = "material-flat")
+  sidebarMenu(
+    menuItem("Covariance Heatmap", tabName = "heatmap_menu"),
+    menuItem("Covariance Diff Heatmap", tabName = "diff_heatmap_menu"),
+    menuItem("Boxplot", tabName = "boxplot_menu"),
+    menuItem("Regression Plot", "regression_menu")
+  ),
+  h4(HTML("<hr>&nbsp&nbsp"), "Advanced"),
+  sidebarMenu(
+    menuItem("Developer Mode", tabName = "developer_menu"),
+    menuItem("Upload Macros", tabName = "macro_menu")
+  ),
+  h4(HTML("<hr>&nbsp&nbsp"), "About"),
+  sidebarMenu(
+    menuItem("About PhysioHBR", tabName = "about_menu")
+  )
 )
 
 bodyUI = div(
-  tableOutput("data_summary"),
+  uiOutput("header_title"),
+  tableOutput("data_summary"), 
   verbatimTextOutput("factor_data_names"),
   verbatimTextOutput("numeric_data_names"),
-  dataTableOutput("data_view")
+  uiOutput("show_hide_summary"),
+  br(),
+  dataTableOutput("data_view"),
+  tabItems(
+    tabItem("heatmap_menu",
+            div(p("Dashboard tab content"))
+    ),
+    tabItem("diff_heatmap_menu",
+            "Widgets tab content"
+    ),
+    tabItem("boxplot_menu",
+            "Sub-item 1 tab content"
+    ),
+    tabItem("regression_menu",
+            "Sub-item 2 tab content"
+    ),
+    tabItem("developer_menu",
+            "Sub-item 2 tab content"
+    ),
+    tabItem("macro_menu",
+            "Sub-item 2 tab content"
+    ),
+    tabItem("about_menu",
+            "Sub-item 2 tab content"
+    )
+  )
 )
 
 ui = dashboardPage(
@@ -57,6 +98,42 @@ ui = dashboardPage(
 )
 
 server = function(input, output, session) {
+  
+  observeEvent(input$data_file, {
+    output$header_title = renderUI({
+      fluidRow(
+        box(
+          h4(tags$strong(paste0("Uploaded Table: ", input$data_file$name))),
+          h5(paste0("Upload Time: ", as.character(Sys.time())))
+        )
+      )
+    })
+  })
+  
+  observeEvent(input$data_file, {
+    output$show_hide_summary = renderUI({
+      div(hr(),
+          fluidRow(
+            column(width = 4,actionBttn(inputId = "show_summary_button", label = "Show Data Summary",
+                                        style = "fill", block = TRUE, color = "success")),
+            column(width = 4,actionBttn(inputId = "hide_summary_button", label = "Hide Data Summary",
+                                        style = "fill", block = TRUE, color = "warning"))
+          ))
+    })
+  })
+  
+  observeEvent(input$show_summary_button, {
+    output$data_view = renderDataTable({
+      req(input$data_file)
+      return(dff)
+    }, options = list(pageLength = 10))
+  })
+  
+  observeEvent(input$hide_summary_button, {
+    output$data_view = renderDataTable({
+      NULL
+    }, options = list(pageLength = 10))
+  })
   
   observeEvent(input$data_file, {
     tryCatch({
@@ -89,17 +166,10 @@ server = function(input, output, session) {
         
       })
     })
-    data.frame(Data_Name = input$data_file$name,
-               Upload_Time = as.character(Sys.time()),
-               Data_Size = paste(round(input$data_file$size * 10^(-6),3), "MB"),
+    data.frame(Data_Size = paste(round(input$data_file$size * 10^(-6),3), "MB"),
                Observation = dim(dff)[1],
                Feature = dim(dff)[2])
   })
-  
-  output$data_view = renderDataTable({
-    req(input$data_file)
-    return(dff)
-  }, options = list(pageLength = 10))
   
   output$sample_data = downloadHandler(
     filename = function(){
