@@ -30,6 +30,10 @@ if(!require("shinyAce")){
   install.packages("shinyAce")
   library("shinyAce")
 }
+if(!require("reshape2")){
+  install.packages("reshape2")
+  library("reshape2")
+}
 
 headerUI = dropdownMenu(messageItem(from = "Admin",
                                     message = "Welcome to Physio HBR!"),
@@ -115,7 +119,7 @@ server = function(input, output, session) {
   observeEvent(input$data_file, {
     output$boxplot_ui = renderUI({
       fluidRow(
-        column(8, actionBttn(inputId = "plot_boxplos", label = "Plot Boxplot", 
+        column(8, actionBttn(inputId = "plot_boxplot", label = "Plot Boxplot", 
                              block = TRUE, color = "primary", style = "fill"))
       )
     })
@@ -273,6 +277,22 @@ server = function(input, output, session) {
       paste("Numeric Variables",
             paste(names(dff)[seq(input$numeric_selection[1], input$numeric_selection[2])], collapse = ", "))
     })
+  })
+  
+  observeEvent(input$plot_heatmap, {
+    print(2)
+  })
+  
+  observeEvent(input$plot_diff_heatmap, {
+    print(1)
+  })
+  
+  observeEvent(input$plot_boxplot, {
+    
+  })
+  
+  observeEvent(input$plot_regression, {
+    
   })
   
   onSessionEnded(function(){stopApp()})
