@@ -3,25 +3,25 @@ plot_cov = function(df, title = "plot title"){
   cormat = round(cor(df),2)
   
   melted_cormat = melt(cormat)
-
+  
   get_lower_tri=function(cormat){
     cormat[upper.tri(cormat)] = NA
     return(cormat)
   }
-
+  
   get_upper_tri = function(cormat){
     cormat[lower.tri(cormat)]= NA
     return(cormat)
   }
   
   upper_tri = get_upper_tri(cormat)
-
+  
   melted_cormat = melt(upper_tri, na.rm = TRUE)
   
   reorder_cormat = function(cormat){
     dd = as.dist((1-cormat)/2)
     hc = hclust(dd)
-    cormat =cormat[hc$order, hc$order]
+    cormat = cormat[hc$order, hc$order]
   }
   
   upper_tri = get_upper_tri(cormat)
