@@ -34,6 +34,12 @@ if(!require("reshape2")){
   install.packages("reshape2")
   library("reshape2")
 }
+if(!require("zip")){
+  install.packages("zip")
+  library("zip")
+}
+
+source("plot_cov.R")
 
 headerUI = dropdownMenu(messageItem(from = "Admin",
                                     message = "Welcome to Physio HBR!"),
@@ -101,7 +107,7 @@ server = function(input, output, session) {
   observeEvent(input$data_file, {
     output$heatmap_ui = renderUI({
       fluidRow(
-        column(8, actionBttn(inputId = "plot_heatmap", label = "Plot Heatmap", 
+        column(8, downloadBttn(outputId = "plot_heatmap", label = "Plot Heatmap", 
                              block = TRUE, color = "royal", style = "fill"))
       )
     })
@@ -259,11 +265,10 @@ server = function(input, output, session) {
   
   output$sample_data = downloadHandler(
     filename = function(){
-      "sample_data_sheet.csv"
+      "sample_data_sheet.xlsx"
     },
     content = function(con){
-      data_download = as.data.frame(read_excel(path = "www/sample_data_sheet.xlsx"))
-      write.csv(data_download, con, quote = FALSE, row.names = FALSE)
+      file.copy("www/sample_data_sheet.xlsx", con)
     }
   )
   
@@ -279,9 +284,21 @@ server = function(input, output, session) {
     })
   })
   
-  observeEvent(input$plot_heatmap, {
-    print(2)
-  })
+  #########################
+  output$plot_heatmap = downloadHandler(
+    filename = function(){
+      "heatmap.zip"
+    },
+    content = function(con){
+      generate_save_heatmap(factor_variable = seq(input$factor_selection[1], input$factor_selection[2]),
+                            numeric_variable = seq(input$numeric_selection[1], input$numeric_selection[2]),
+                            data = dff)
+      file.copy("www/heatmap.zip", con)
+      file.remove("www/heatmap.zip")
+    },
+    contentType = "application/zip"
+  )
+  
   
   observeEvent(input$plot_diff_heatmap, {
     print(1)
