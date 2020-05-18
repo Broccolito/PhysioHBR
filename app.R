@@ -65,6 +65,62 @@ ui = dashboardPagePlus(
                           )
                   ),
                   uiOutput("heatmap_display_ui")
+                )),
+                tabPanel("Boxplot", fluidPage(
+                  br(),
+                  boxPlus(collapsible = FALSE, width = 6,height = NULL,
+                          closable = FALSE,
+                          fluidRow(
+                            column(3, actionButton(inputId = "plot_boxplots", label = "Plot Boxplots")),
+                            column(9, sliderInput(inputId = "boxplot_picture_size",
+                                                  label = "Picture Size (px)", min = 200, max = 1500,
+                                                  value = 650))
+                          )
+                  ),
+                  boxPlus(collapsible = FALSE, width = 6,height = NULL,
+                          closable = FALSE,
+                          fluidRow(
+                            column(3, actionButton(inputId = "save_all_boxplots", label = "Save Boxplots")),
+                            column(4, sliderInput(inputId = "boxplot_width",
+                                                  label = "Saved Graphics Width (in)", min = 5, max = 15,
+                                                  value = 7)),
+                            column(4, sliderInput(inputId = "boxplot_height",
+                                                  label = "Saved Graphics Height (in)", min = 5, max = 15,
+                                                  value = 7))
+                          )
+                  ),
+                  boxPlus(collapsible = FALSE, width = 12,height = NULL,
+                          closable = FALSE, align = "center",
+                          uiOutput("boxplot_display_ui")
+                  )
+                )),
+                tabPanel("Regression", fluidPage(
+                  br(),
+                  boxPlus(collapsible = FALSE, width = 6,height = NULL,
+                          closable = FALSE,
+                          fluidRow(
+                            column(3, actionButton(inputId = "plot_regression_plot", label = "Plot Regression Plots")),
+                            column(9, sliderInput(inputId = "regression_plot_picture_size",
+                                                  label = "Picture Size (px)", min = 200, max = 1500,
+                                                  value = 650))
+                          )
+                  ),
+                  boxPlus(collapsible = FALSE, width = 6,height = NULL,
+                          closable = FALSE,
+                          fluidRow(
+                            column(3, actionButton(inputId = "save_all_regression_plots", label = "Save Regression Plots")),
+                            column(4, sliderInput(inputId = "regression_plot_width",
+                                                  label = "Saved Graphics Width (in)", min = 5, max = 15,
+                                                  value = 7)),
+                            column(4, sliderInput(inputId = "regression_plot_height",
+                                                  label = "Saved Graphics Height (in)", min = 5, max = 15,
+                                                  value = 7))
+                          )
+                  ),
+                  boxPlus(collapsible = FALSE, width = 12,height = NULL,
+                          closable = FALSE, align = "center",
+                          uiOutput("regression_plot_display_ui")
+                  )
                 ))
     )
     
@@ -72,6 +128,139 @@ ui = dashboardPagePlus(
 )
 
 server = function(input, output, session){
+  
+  observeEvent(input$plot_regression_plot,{
+    showModal(modalDialog(title = "Displaying Significant Regression Plots ...",
+                          "Rendering regression plots showing significant correlations ... "))
+    
+    max_plots = dim(regression_result)[1]
+    
+    output$regression_plot_display_ui = renderUI({
+      regression_plot_output_list = lapply(1:max_plots, function(i){
+        regressionplotname = paste("regression_plot", i, sep="")
+        plotOutput(regressionplotname, height = input$regression_plot_picture_size,
+                   width = input$regression_plot_picture_size)
+      })
+      do.call(tagList, regression_plot_output_list)
+    })
+    
+    for(i in 1:max_plots){
+      x_name = as.character(regression_result$x[i])
+      y_name = as.character(regression_result$y[i])
+      x = as.numeric(as.character(data_file_numeric[[x_name]]))
+      y = as.numeric(as.character(data_file_numeric[[y_name]]))
+      xy = data.frame(x = x, y = y) %>%
+        na.omit()
+      fig = ggplot(data = xy, aes(x = x, y = y)) + 
+        geom_smooth(method = "lm",color = "black",formula = "y~x") +
+        geom_point(size = 2) + 
+        xlab(x_name) + 
+        ylab(y_name) +
+        ggtitle(label = "", subtitle = paste0("P = ",round(regression_result$p_value[i],3),
+                                              "; Effect Size = ", round(regression_result$effect_size,3),
+                                              "; N = ",regression_result$n)) +
+        theme_bw()
+      assign(paste0("regression_fig",i),fig)
+    }
+    
+    for (i in 1:max_plots){
+      local({
+        local_i = i
+        regressionplotname = paste("regression_plot", local_i, sep="")
+        output[[regressionplotname]] = renderPlot({
+          get(paste0("regression_fig",local_i))
+        })
+      })
+    }
+    
+    removeModal()
+    
+    
+    
+  })
+  
+  observeEvent(input$save_all_boxplots,{
+    
+    showModal(modalDialog(title = "Saving Significant Boxplots ...",
+                          "Writing significant boxplots to png files ... \n
+                          This process may take a while, dependent on the number of figures to export."))
+    
+    max_plots = dim(ttest_anova_result)[1]
+    for(i in 1:max_plots){
+      x_name = as.character(ttest_anova_result$x[i])
+      y_name = as.character(ttest_anova_result$y[i])
+      x = data_file_factor[[x_name]]
+      y = as.numeric(as.character(data_file_numeric[[y_name]]))
+      xy = data.frame(x = x, y = y) %>%
+        na.omit()
+      fig = ggplot(data = xy, aes(x = x, y = y)) + 
+        geom_boxplot() + 
+        geom_point(size = 2) + 
+        xlab(x_name) + 
+        ylab(y_name) +
+        ggtitle(label = "", subtitle = paste0("P = ",round(ttest_anova_result$p_value[i],3),
+                                              "; N = ", ttest_anova_result$n_numeric[i])) + 
+        theme_bw() + 
+        theme(plot.margin = margin(1, 1, 1, 1, "cm")) + 
+        ggsave(filename = paste0("output/Boxplot ",y_name,
+                                 " Vs. ",x_name,
+                                 gsub(":",".",date()),".png"),
+               device = "png", dpi = 1200,
+               width = input$boxplot_width,
+               height = input$boxplot_height)
+    }
+    
+    removeModal()
+    
+  })
+  
+  observeEvent(input$plot_boxplots,{
+    
+    showModal(modalDialog(title = "Displaying Significant Boxplots ...",
+                          "Rendering boxplots showing significant differences ... "))
+    
+    max_plots = dim(ttest_anova_result)[1]
+    
+    output$boxplot_display_ui = renderUI({
+      boxplot_output_list = lapply(1:max_plots, function(i){
+        boxplotname = paste("boxplot_plot", i, sep="")
+        plotOutput(boxplotname, height = input$boxplot_picture_size,
+                   width = input$boxplot_picture_size)
+      })
+      do.call(tagList, boxplot_output_list)
+    })
+    for(i in 1:max_plots){
+      x_name = as.character(ttest_anova_result$x[i])
+      y_name = as.character(ttest_anova_result$y[i])
+      x = data_file_factor[[x_name]]
+      y = as.numeric(as.character(data_file_numeric[[y_name]]))
+      xy = data.frame(x = x, y = y) %>%
+        na.omit()
+      fig = ggplot(data = xy, aes(x = x, y = y)) + 
+        geom_boxplot() + 
+        geom_point(size = 2) + 
+        xlab(x_name) + 
+        ylab(y_name) +
+        ggtitle(label = "", subtitle = paste0("P = ",round(ttest_anova_result$p_value[i],3),
+                                              "; N = ", ttest_anova_result$n_numeric[i])) + 
+        theme_bw() + 
+        theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+      assign(paste0("ttest_anova_fig",i),fig)
+    }
+    
+    for (i in 1:max_plots){
+      local({
+        local_i = i
+        boxplotname = paste("boxplot_plot", local_i, sep="")
+        output[[boxplotname]] = renderPlot({
+          get(paste0("ttest_anova_fig",local_i))
+        })
+      })
+    }
+    
+    removeModal()
+    
+  })
   
   plot_cov = function(df, title = "Correlation Matrix"){
     cormat = round(cor(df,use="na.or.complete"),2)
