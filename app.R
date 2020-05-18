@@ -1,319 +1,520 @@
-if(!require("shiny")){
-  install.packages("shiny")
-  library("shiny")
-}
-if(!require("shinydashboard")){
-  install.packages("shinydashboard")
-  library("shinydashboard")
-}
-if(!require("shinyWidgets")){
-  install.packages("shinyWidgets")
-  library("shinyWidgets")
-}
-if(!require("ggplot2")){
-  install.packages("ggplot2")
-  library("ggplot2")
-}
-if(!require("readxl")){
-  install.packages("readxl")
-  library("readxl")
-}
-if(!require("knitr")){
-  install.packages("knitr")
-  library("knitr")
-}
-if(!require("shinyjs")){
-  install.packages("shinyjs")
-  library("shinyjs")
-}
-if(!require("shinyAce")){
-  install.packages("shinyAce")
-  library("shinyAce")
-}
-if(!require("reshape2")){
-  install.packages("reshape2")
-  library("reshape2")
-}
-if(!require("zip")){
-  install.packages("zip")
-  library("zip")
-}
+library(shiny)
+library(shinydashboard)
+library(shinydashboardPlus)
+library(shinyWidgets)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
 
-source("plot_cov.R")
-
-headerUI = dropdownMenu(messageItem(from = "Admin",
-                                    message = "Welcome to Physio HBR!"),
-                        type = "messages", badgeStatus = "primary")
-
-sidebarUI = div(
-  sidebarMenu(
-    br(),
-    downloadBttn(outputId = "sample_data", label = "Download Sample Data", style = "simple"),
-    h4(HTML("<hr>&nbsp&nbsp"), "Upload Data"),
-    menuItem("Data Preparation",
-             br(),
-             fileInput(inputId = "data_file", label = "Upload Data File", 
-                       multiple = FALSE, accept = c(".csv", ".xlsx")),
-             sliderInput("factor_selection", label = "Factor Range", min = 1, 
-                         max = 100, value = c(1, 2)),
-             sliderInput("numeric_selection", label = "Numeric Range", min = 1, 
-                         max = 100, value = c(1, 2))),
-    h4(HTML("<hr>&nbsp&nbsp"), "Analysis"),
-    menuItem("Covariance Heatmap", tabName = "heatmap_menu"),
-    menuItem("Covariance Diff Heatmap", tabName = "diff_heatmap_menu"),
-    menuItem("Boxplot", tabName = "boxplot_menu"),
-    menuItem("Regression Plot", tabName = "regression_menu")
-  ),
-  h4(HTML("<hr>&nbsp&nbsp"), "Advanced"),
-  sidebarMenu(
-    menuItem("Developer Mode", tabName = "developer_menu"),
-    menuItem("Upload Macros", tabName = "macro_menu")
-  ),
-  h4(HTML("<hr>&nbsp&nbsp"), "About"),
-  sidebarMenu(
-    menuItem("About PhysioHBR", tabName = "about_menu")
+ui = dashboardPagePlus(
+  skin = "black",
+  header = dashboardHeaderPlus(title = "Physio HBR", titleWidth = 400),
+  sidebar = dashboardSidebar(
+    sidebarMenu(
+      
+      menuItem("Analysis",div(
+        fileInput(inputId = "data_file_path",
+                  label = "Input Data (.csv required)", 
+                  accept = c(".csv")),
+        actionBttn(inputId ="read_file", label = "Read File", 
+                   size = "md", style = "fill", block = FALSE),
+        br(),
+        sliderInput(inputId = "p_cutoff", label = "Significant P Value",
+                    min = 1e-20, max = 1, value = 0.05),
+        actionBttn(inputId ="run_analysis", label = "Run Analysis", 
+                   size = "md", style = "fill", block = FALSE),
+        br()
+      ), startExpanded = TRUE),
+      
+      menuItem("Settings",div(
+        
+      )),
+      
+      menuItem("Developers",div(
+        
+      ))
+      
+    ),
+    width = 400),
+  
+  body = dashboardBody(
+    tabsetPanel(type = "tabs",
+                tabPanel("Data Table", uiOutput("data_display_ui")),
+                tabPanel("Statistics", uiOutput("test_stats_display_ui")),
+                tabPanel("Heatmap", fluidPage(
+                  br(),
+                  boxPlus(collapsible = FALSE, width = 6,height = NULL,
+                          closable = FALSE,
+                          fluidRow(
+                            column(3, actionButton(inputId = "plot_heatmaps", label = "Plot Heatmaps")),
+                            column(9, sliderInput(inputId = "heatmap_picture_size",
+                                                  label = "Picture Size (px)", min = 200, max = 1500,
+                                                  value = 650))
+                          )
+                  ),
+                  boxPlus(collapsible = FALSE, width = 6,height = NULL,
+                          closable = FALSE,
+                          fluidRow(
+                            column(3, actionButton(inputId = "save_all_heatmap_plots", label = "Save Heatmaps")),
+                            column(4, sliderInput(inputId = "heatmap_width",
+                                                  label = "Saved Graphics Width (in)", min = 5, max = 15,
+                                                  value = 7)),
+                            column(4, sliderInput(inputId = "heatmap_height",
+                                                  label = "Saved Graphics Height (in)", min = 5, max = 15,
+                                                  value = 7))
+                          )
+                  ),
+                  uiOutput("heatmap_display_ui")
+                ))
+    )
+    
   )
 )
 
-bodyUI = div(
-  box(width = 12,collapsible = TRUE, collapsed = FALSE, solidHeader = TRUE,
-      uiOutput("header_title"),
-      tableOutput("data_summary"),
-      verbatimTextOutput("factor_data_names"),
-      verbatimTextOutput("numeric_data_names"),
-      uiOutput("show_hide_summary"),
-      br(),
-      dataTableOutput("data_view")
-  ),
-  tabItems(
-    tabItem("heatmap_menu", uiOutput("heatmap_ui")),
-    tabItem("diff_heatmap_menu", uiOutput("diff_heatmap_ui")),
-    tabItem("boxplot_menu", uiOutput("boxplot_ui")),
-    tabItem("regression_menu", uiOutput("regression_ui")),
-    tabItem("developer_menu", uiOutput("developer_ui")),
-    tabItem("macro_menu", uiOutput("macro_ui")),
-    tabItem("about_menu", uiOutput("about_ui"))
-  )
-)
-
-ui = dashboardPage(
-  header = dashboardHeader(headerUI, title = "Physio HBR", titleWidth = 300),
-  sidebar = dashboardSidebar(sidebarUI, width = 300),
-  body = dashboardBody(bodyUI)
-)
-
-server = function(input, output, session) {
+server = function(input, output, session){
   
-  observeEvent(input$data_file, {
-    output$heatmap_ui = renderUI({
-      fluidRow(
-        column(8, downloadBttn(outputId = "plot_heatmap", label = "Plot Heatmap", 
-                             block = TRUE, color = "royal", style = "fill"))
-      )
-    })
-  })
+  plot_cov = function(df, title = "Correlation Matrix"){
+    cormat = round(cor(df,use="na.or.complete"),2)
+    melted_cormat = melt(cormat)
+    get_lower_tri=function(cormat){
+      cormat[upper.tri(cormat)] = NA
+      return(cormat)
+    }
+    get_upper_tri = function(cormat){
+      cormat[lower.tri(cormat)]= NA
+      return(cormat)
+    }
+    upper_tri = get_upper_tri(cormat)
+    melted_cormat = melt(upper_tri, na.rm = TRUE)
+    reorder_cormat = function(cormat){
+      dd = as.dist((1-cormat)/2)
+      hc = hclust(dd)
+      cormat = cormat[hc$order, hc$order]
+    }
+    upper_tri = get_upper_tri(cormat)
+    melted_cormat = melt(upper_tri, na.rm = TRUE)
+    ggheatmap = ggplot(melted_cormat, aes(Var2, Var1, fill = value)) +
+      geom_tile(color = "white")+
+      scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                           midpoint = 0, limit = c(-1,1), space = "Lab", 
+                           name="Pearson Correlation") +
+      theme_minimal()+ # minimal theme
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                       size = 12, hjust = 1))+
+      coord_fixed()
+    plot_output = ggheatmap + 
+      geom_text(aes(Var2, Var1, label = value), color = "black", size = 3) +
+      theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        legend.justification = c(1, 0),
+        legend.position = c(0.6, 0.7),
+        legend.direction = "horizontal")+
+      guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                                   title.position = "top", title.hjust = 0.5)) + 
+      ggtitle(title)
+    return(plot_output)
+  }
   
-  observeEvent(input$data_file, {
-    output$diff_heatmap_ui = renderUI({
-      fluidRow(
-        column(8, actionBttn(inputId = "plot_diff_heatmap", label = "Plot Diff Heatmap", 
-                             block = TRUE, color = "success", style = "fill"))
-      )
-    })
-  })
+  plot_p_cov = function(df, title = "Significant Positive (Red) and Negative (Blue) Correlations"){
+    n = dim(df)[1]
+    cormat = cor(df,use="na.or.complete")
+    t_value_mat = cormat/((1-cormat^2)/(n-2))^0.5
+    t_value_mat[t_value_mat <= -1.644854] = -1000
+    t_value_mat[t_value_mat >= 1.644854] = 1000
+    t_value_mat[t_value_mat > -1.644854 & t_value_mat < 1.644854] = 0
+    p_value_mat = pnorm(t_value_mat)
+    p_value_mat = round((p_value_mat - 0.5) * 2, 0)
+    cormat = p_value_mat
+    melted_cormat <- melt(cormat)
+    # Get lower triangle of the correlation matrix
+    get_lower_tri = function(cormat){
+      cormat[upper.tri(cormat)] <- NA
+      return(cormat)
+    }
+    # Get upper triangle of the correlation matrix
+    get_upper_tri = function(cormat){
+      cormat[lower.tri(cormat)]<- NA
+      return(cormat)
+    }
+    upper_tri = get_upper_tri(cormat)
+    # Melt the correlation matrix
+    melted_cormat = melt(upper_tri, na.rm = TRUE)
+    reorder_cormat = function(cormat){
+      # Use correlation between variables as distance
+      dd = as.dist((1-cormat)/2)
+      hc = hclust(dd)
+      cormat = cormat[hc$order, hc$order]
+    }
+    # Reorder the correlation matrix
+    # cormat <- reorder_cormat(cormat)
+    upper_tri = get_upper_tri(cormat)
+    # Melt the correlation matrix
+    melted_cormat = melt(upper_tri, na.rm = TRUE)
+    # Create a ggheatmap
+    ggheatmap = ggplot(melted_cormat, aes(Var2, Var1, fill = value)) +
+      geom_tile(color = "white")+
+      scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                           midpoint = 0, limit = c(-1,1), space = "Lab", 
+                           name="Pearson Correlation") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                       size = 12, hjust = 1)) +
+      coord_fixed()
+    plot_output = ggheatmap + 
+      geom_text(aes(Var2, Var1, label = value), color = "black", size = 3) +
+      theme(
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        legend.justification = c(1, 0),
+        legend.position = c(0.6, 0.7),
+        legend.direction = "horizontal")+
+      guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                                   title.position = "top", title.hjust = 0.5)) + 
+      ggtitle(title)
+    return(plot_output)
+  }
   
-  observeEvent(input$data_file, {
-    output$boxplot_ui = renderUI({
-      fluidRow(
-        column(8, actionBttn(inputId = "plot_boxplot", label = "Plot Boxplot", 
-                             block = TRUE, color = "primary", style = "fill"))
-      )
-    })
-  })
-  
-  observeEvent(input$data_file, {
-    output$regression_ui = renderUI({
-      fluidRow(
-        column(8, actionBttn(inputId = "plot_regression", label = "Plot Regression Plot", 
-                             block = TRUE, color = "danger", style = "fill"))
-      )
-    })
-  })
-  
-  output$developer_ui = renderUI({
-    initial_value = "
-    ### Use dff to refer to the data frame uploaded
-    list(
-    data_summary = summary(dff)
-    )
-    "
-    box(width = 12, solidHeader = TRUE, title = "Terminal",
-        aceEditor("code", mode = "r", height = "200px", value = initial_value),
-        fluidRow(
-          column(4, actionBttn(inputId = "eval_code", label = "Analyse", 
-                               block = TRUE, style = "fill", color = "royal"))),
-        hr(),
-        verbatimTextOutput("terminal_output")
-    )
-  })
-  
-  output$terminal_output = renderPrint({
-    input$eval_code
-    eval(parse(text = isolate(input$code)))
-  })
-  
-  output$macro_ui = renderUI({
-    init_value = "
-    Fill in the description of the macro uploaded.
-    E.g:
-    \"\"\"
-    This Macro is used to run multiple linear regressions on uploaded data files..
-    Function X and Function Y are used for ...
-    This Macro is composed by WG 2019 and IX 2019 ... 
-    \"\"\"
-    "
-    box(
-      fileInput(inputId = "uploaded_macro", label = "Upload Macro", multiple = TRUE),
-      hr(),
-      h4("Macro Descriotion"),
-      textAreaInput(inputId = "macro_description", label = NULL, placeholder = init_value,
-                    resize = "both", width = "300", height = "300px"),
-      actionBttn(inputId = "submit_macro", label = "Submit Macro", style = "fill",
-                 block = TRUE, color = "primary")
-    )
-  })
-  
-  output$about_ui = renderUI({
-    box(width = 12,
-        includeMarkdown("README.md")
-    )
-  })
-  
-  #####################################################
-  
-  observeEvent(input$data_file, {
-    output$header_title = renderUI({
-      fluidRow(
-        box(width = 12,
-            h4(tags$strong(paste0("Uploaded Table: ", input$data_file$name))),
-            h5(paste0("Upload Time: ", as.character(Sys.time())))
+  observeEvent(input$plot_heatmaps,{
+    output$heatmap_display_ui = renderUI({
+      div(
+        boxPlus(collapsible = FALSE, width = 12,height = input$heatmap_picture_size,
+                closable = FALSE,
+                plotOutput("correlation_heatmap_plot", height = input$heatmap_picture_size*0.9),
+                actionButton(inputId = "save_correlation_heatmap_plot",label = "Save Plot")
+        ),
+        boxPlus(collapsible = FALSE, width = 12,height = input$heatmap_picture_size,
+                closable = FALSE,
+                plotOutput("significant_heatmap_plot", height = input$heatmap_picture_size*0.9),
+                actionButton(inputId = "save_significant_heatmap_plot",label = "Save Plot")
         )
       )
     })
   })
   
-  observeEvent(input$data_file, {
-    output$show_hide_summary = renderUI({
-      div(hr(),
-          fluidRow(
-            column(width = 4,actionBttn(inputId = "show_summary_button", label = "Show Table",
-                                        style = "fill", block = TRUE, color = "success")),
-            column(width = 4,actionBttn(inputId = "hide_summary_button", label = "Hide Table",
-                                        style = "fill", block = TRUE, color = "warning"))
-          ))
+  observeEvent(input$save_all_heatmap_plots,{
+    
+    showModal(modalDialog(title = "Saving heatmap plots ...",
+                          "Writing heatmap plots to png files ... "))
+    
+    data_file_numeric = data_file_numeric %>% 
+      mutate_all(type.convert) %>% 
+      mutate_if(is.factor, as.numeric)
+    plot_cov(df = data_file_numeric) + 
+      ggsave(filename = paste0("output/correlation heatmap plot",gsub(":",".",date()),".png"),
+             device = "png", dpi=1200,
+             width = input$heatmap_width,
+             height = input$heatmap_height)
+    
+    data_file_numeric = data_file_numeric %>% 
+      mutate_all(type.convert) %>% 
+      mutate_if(is.factor, as.numeric)
+    plot_p_cov(df = data_file_numeric) + 
+      ggsave(filename = paste0("output/significant heatmap plot",gsub(":",".",date()),".png"),
+             device = "png", dpi=1200,
+             width = input$heatmap_width,
+             height = input$heatmap_height)
+    
+    removeModal()
+    
+  })
+  
+  observeEvent(input$save_correlation_heatmap_plot,{
+    
+    showModal(modalDialog(title = "Saving correlation heatmap plot ...",
+                          "Writing the heatmap plot to png files ... "))
+    
+    data_file_numeric = data_file_numeric %>% 
+      mutate_all(type.convert) %>% 
+      mutate_if(is.factor, as.numeric)
+    plot_cov(df = data_file_numeric) + 
+      ggsave(filename = paste0("output/correlation heatmap plot",gsub(":",".",date()),".png"),
+             device = "png", dpi=1200,
+             width = input$heatmap_width,
+             height = input$heatmap_height)
+    
+    removeModal()
+    
+  })
+  
+  observeEvent(input$save_significant_heatmap_plot,{
+    
+    showModal(modalDialog(title = "Saving significant correlation plot ...",
+                          "Writing the heatmap plot to png files ... "))
+    
+    data_file_numeric = data_file_numeric %>% 
+      mutate_all(type.convert) %>% 
+      mutate_if(is.factor, as.numeric)
+    plot_p_cov(df = data_file_numeric) + 
+      ggsave(filename = paste0("output/significant heatmap plot",gsub(":",".",date()),".png"),
+             device = "png", dpi=1200,
+             width = input$heatmap_width,
+             height = input$heatmap_height)
+    
+    removeModal()
+    
+  })
+  
+  observeEvent(input$plot_heatmaps,{
+    output$correlation_heatmap_plot = renderPlot({
+      data_file_numeric = data_file_numeric %>% 
+        mutate_all(type.convert) %>% 
+        mutate_if(is.factor, as.numeric)
+      plot_cov(df = data_file_numeric)
     })
   })
   
-  observeEvent(input$show_summary_button, {
-    output$data_view = renderDataTable({
-      req(input$data_file)
-      return(dff)
-    }, options = list(pageLength = 10))
+  observeEvent(input$plot_heatmaps,{
+    output$significant_heatmap_plot = renderPlot({
+      data_file_numeric = data_file_numeric %>% 
+        mutate_all(type.convert) %>% 
+        mutate_if(is.factor, as.numeric)
+      plot_p_cov(df = data_file_numeric)
+    })
   })
   
-  observeEvent(input$hide_summary_button, {
-    output$data_view = renderDataTable({
-      NULL
-    }, options = list(pageLength = 10))
+  
+  
+  observeEvent(input$save_ttest_anova_table,{
+    showModal(modalDialog(title = "Saving Files ...",
+                          "Writing Table to a csv file"))
+    filename = paste("T test ANOVA Statistics ",gsub(":",".",date()),".csv", sep = "")
+    filepath = paste0("output/",filename)
+    write.csv(regression_result, 
+              file = filepath,
+              quote = FALSE,
+              row.names = FALSE)
+    removeModal()
   })
   
-  observeEvent(input$data_file, {
-    tryCatch({
-      df = as.data.frame(read_excel(input$data_file$datapath))
-    },
-    error = function(e) {
-      tryCatch({
-        df = as.data.frame(read.csv(input$data_file$datapath))
-      },
-      error = function(ee){
-        stop(safeError(ee))
-      })
-    }
+  observeEvent(input$save_regression_table,{
+    showModal(modalDialog(title = "Saving Files ...",
+                          "Writing Table to a csv file"))
+    filename = paste("/Regression Statistics ",gsub(":",".",date()),".csv", sep = "")
+    filepath = paste0("output/",filename)
+    write.csv(regression_result, 
+              file = filepath,
+              quote = FALSE,
+              row.names = FALSE)
+    removeModal()
+  })
+  
+  observeEvent(input$run_analysis,{
+    output$test_stats_display_ui = renderUI({
+      div(
+        fluidRow(
+          column(6,
+                 div(
+                   hr(),
+                   h4("Regression Statistics"),
+                   tableOutput("regression_table_output"),
+                   actionButton(inputId = "save_regression_table",
+                                label = "Save Table")
+                 )
+          ),
+          column(6,
+                 div(
+                   hr(),
+                   h4("T test and ANOVA Statistics"),
+                   tableOutput("ttest_anova_table_output"),
+                   actionButton(inputId = "save_ttest_anova_table",
+                                label = "Save Table")
+                 )
+          )
+        )
+      )
+    })
+  })
+  
+  observeEvent(input$run_analysis,{
+    
+    showModal(
+      modalDialog(title = "Data Processing ... ", 
+                  "Statistics Tables will be displayed once the analysis is finished ... "
+      )
     )
-    updateNumericInput(session, "factor_selection", max = dim(df)[2])
-    updateNumericInput(session, "numeric_selection", max = dim(df)[2])
-  })
-  
-  output$data_summary = renderTable({
-    req(input$data_file)
-    tryCatch({
-      dff <<- as.data.frame(read_excel(input$data_file$datapath))
-    },
-    error = function(e) {
-      tryCatch({
-        dff <<- as.data.frame(read.csv(input$data_file$datapath))
-      },
-      error = function(ee){
-        stop(safeError(ee))
-        
-      })
-    })
-    data.frame(Data_Size = paste(round(input$data_file$size * 10^(-6),3), "MB"),
-               Observation = dim(dff)[1],
-               Feature = dim(dff)[2])
-  })
-  
-  output$sample_data = downloadHandler(
-    filename = function(){
-      "sample_data_sheet.xlsx"
-    },
-    content = function(con){
-      file.copy("www/sample_data_sheet.xlsx", con)
+    
+    p_cutoff = input$p_cutoff
+    
+    l_res_mat = vector()
+    data_file_numeric_name = names(data_file_numeric) 
+    for(i in 1:dim(data_file_numeric)[2]){
+      for(j in 1:dim(data_file_numeric)[2]){
+        if(j > i){
+          try({
+            x_name = data_file_numeric_name[i]
+            y_name = data_file_numeric_name[j]
+            xy = data.frame(x = as.numeric(data_file_numeric[,i]),
+                            y = as.numeric(data_file_numeric[,j])) %>%
+              na.omit()
+            l = summary(lm(formula = y~x, data = xy))
+            effsize = l$coefficients[2,1]
+            p_value = l$coefficients[2,4]
+            n = dim(xy)[1]
+            l_res = data.frame(x = x_name, y = y_name, n = n,
+                               effect_size = effsize, p_value = p_value)
+            l_res_mat = rbind.data.frame(l_res_mat, l_res)
+          }, silent = TRUE)
+        }
+      }
     }
-  )
-  
-  observeEvent(input$data_file, {
-    output$factor_data_names = renderText({
-      paste("Factor Variables:", 
-            paste(names(dff)[seq(input$factor_selection[1], input$factor_selection[2])], collapse = ", "))
+    l_res_mat = arrange(l_res_mat, p_value) %>%
+      filter(p_value <= p_cutoff)
+    
+    f_res_mat = vector()
+    data_file_factor_name = names(data_file_factor)
+    data_file_numeric_name = names(data_file_numeric)
+    for(i in 1:dim(data_file_factor)[2]){
+      for(j in 1:dim(data_file_numeric)[2]){
+        try({
+          x_name = data_file_factor_name[i]
+          y_name = data_file_numeric_name[j]
+          xy = data.frame(x = as.factor(data_file_factor[,i]),
+                          y = as.numeric(data_file_numeric[,j])) %>%
+            na.omit()
+          n_factor = length(unique(xy$x))
+          n_numeric = length(unique(xy$y))
+          if(n_factor <= 2){
+            ttest = t.test(formula = y ~ x, data = xy)
+            p_value = ttest$p.value
+            effsize = diff(ttest$estimate)
+            method = "T test"
+            f_res = data.frame(x = x_name, y = y_name, 
+                               n_factor = n_factor, n_numeric = n_numeric,
+                               effect_size = effsize, p_value = p_value,
+                               method = method)
+          }else{
+            anv = aov(formula = y ~ x, data = xy)
+            p_value = summary(anv)[[1]][["Pr(>F)"]][1]
+            effsize = NA
+            method = "ANOVA"
+            f_res = data.frame(x = x_name, y = y_name, 
+                               n_factor = n_factor, n_numeric = n_numeric,
+                               effect_size = effsize, p_value = p_value,
+                               method = method)
+          }
+          f_res_mat = rbind.data.frame(f_res_mat, f_res)
+        })
+      }
+    }
+    rownames(f_res_mat) = NULL
+    f_res_mat = arrange(f_res_mat, p_value) %>%
+      filter(p_value <= p_cutoff)
+    
+    output$regression_table_output = renderTable({
+      assign("regression_result",l_res_mat,envir = .GlobalEnv)
+      l_res_mat
     })
     
-    output$numeric_data_names = renderText({
-      paste("Numeric Variables",
-            paste(names(dff)[seq(input$numeric_selection[1], input$numeric_selection[2])], collapse = ", "))
+    output$ttest_anova_table_output = renderTable({
+      assign("ttest_anova_result",f_res_mat,envir = .GlobalEnv)
+      f_res_mat
+    })
+    
+    removeModal()
+    
+  })
+  
+  observeEvent(input$read_file,{
+    output$data_display_ui = renderUI({
+      div(
+        hr(),
+        h4("Subject ID list"),
+        tableOutput("id_data_table_output"),
+        hr(),
+        h4("Factor data head"),
+        tableOutput("factor_data_table_output"),
+        hr(),
+        h4("Numeric data head"),
+        tableOutput("numeric_data_table_output"),
+        hr(),
+        h4("Character data head"),
+        tableOutput("character_data_table_output"),
+        hr()
+      )
     })
   })
   
-  #########################
-  output$plot_heatmap = downloadHandler(
-    filename = function(){
-      "heatmap.zip"
-    },
-    content = function(con){
-      generate_save_heatmap(factor_variable = seq(input$factor_selection[1], input$factor_selection[2]),
-                            numeric_variable = seq(input$numeric_selection[1], input$numeric_selection[2]),
-                            data = dff)
-      file.copy("www/heatmap.zip", con)
-      file.remove("www/heatmap.zip")
-    },
-    contentType = "application/zip"
-  )
-  
-  
-  observeEvent(input$plot_diff_heatmap, {
-    print(1)
-  })
-  
-  observeEvent(input$plot_boxplot, {
+  data_file = NULL
+  observeEvent(input$read_file,{
+    if(!is.null(input$data_file_path)){
+      data_file = read.csv(input$data_file_path$datapath)
+    }
+    data_file_data_type = data_file[1,]
+    data_file = data_file[-1,]
+    
+    data_file_id <<- data_file[,1,drop=FALSE]
+    data_file_numeric <<- data_file[,which(data_file_data_type=="numeric"),drop=FALSE]
+    data_file_character <<- data_file[,which(data_file_data_type=="character"),drop=FALSE]
+    data_file_factor <<- data_file[,which(data_file_data_type=="factor"),drop=FALSE]
+    
+    output$id_data_table_output = renderTable(colnames = FALSE,{
+      table_dimension = dim(data_file_id)
+      data_file_id_display = data_file_id
+      if(table_dimension[1]>10){
+        data_file_id_display_1 = as.character(data_file_id_display[c(1:4),])
+        data_file_id_display_2 = as.character(data_file_id_display[(table_dimension[1]-3):table_dimension[1],])
+        data_file_id_display = c(data_file_id_display_1," ... ",data_file_id_display_2)
+      }else{
+        data_file_id_display = as.character(data_file_id_display)
+      }
+      data_file_id_display = t(data.frame(id = data_file_id_display))
+      colnames(data_file_id_display) = NULL
+      data_file_id_display
+    })
+    
+    output$factor_data_table_output = renderTable({
+      table_dimension = dim(data_file_factor)
+      data_file_factor_display = data_file_factor
+      if(table_dimension[1] >= 5){
+        data_file_factor_display = data_file_factor_display[1:5,]
+      }
+      if(table_dimension[2] >= 15){
+        data_file_factor_display = data_file_factor_display[,1:15]
+      }
+      data_file_factor_display
+    })
+    
+    output$numeric_data_table_output = renderTable({
+      table_dimension = dim(data_file_numeric)
+      data_file_numeric_display = data_file_numeric
+      if(table_dimension[1] >= 5){
+        data_file_numeric_display = data_file_numeric_display[1:5,]
+      }
+      if(table_dimension[2] >= 15){
+        data_file_numeric_display = data_file_numeric_display[,1:15]
+      }
+      data_file_numeric_display
+    })
+    
+    output$character_data_table_output = renderTable({
+      table_dimension = dim(data_file_character)
+      data_file_character_display = data_file_character
+      if(table_dimension[1] >= 5){
+        data_file_character_display = head(data_file_character_display,5)
+      }
+      if(table_dimension[2] >= 15){
+        data_file_character_display = data_file_character_display[,1:15,drop=FALSE]
+      }
+      data_file_character_display
+    })
     
   })
   
-  observeEvent(input$plot_regression, {
-    
-  })
   
-  onSessionEnded(function(){stopApp()})
+  
+  
+  onSessionEnded(function(){
+    stopApp()
+  })
 }
 
 shinyApp(ui, server)
-
