@@ -154,6 +154,7 @@ server = function(input, output, session){
       fig = ggplot(data = xy, aes(x = x, y = y)) + 
         geom_smooth(method = "lm",color = "black",formula = "y~x") +
         geom_point(size = 2) + 
+        geom_point(size = 2) + 
         xlab(x_name) + 
         ylab(y_name) +
         ggtitle(label = "", subtitle = paste0("P = ",round(regression_result$p_value[i],3),
